@@ -112,10 +112,7 @@ namespace radix_heap {
 
         template<typename KeyType>
         class encoder : public encoder_impl_integer<KeyType, std::is_signed<KeyType>::value> {};
-        // TODO encoder<int> needed?
-/*      template<>
-        class encoder<int> : public encoder_impl_decimal<int, uint32_t>{};
-*/
+
         template<>
         class encoder<float> : public encoder_impl_decimal<float, uint32_t> {};
         template<>
@@ -131,13 +128,13 @@ namespace radix_heap {
             void set_empty(size_t bucket) {
                 assert(bucket <= num_buckets);
 
-                flags_ &= ~((unsigned_key_type(1) << (bucket - 1)) * !!bucket);
+                flags_ &= ~((unsigned_key_type(1) << (bucket - 1)) * (bucket != 0)); //!!bucket);
             }
 
             void set_non_empty(unsigned int bucket) {
                 assert(bucket <= num_buckets);
 
-                flags_ |= (unsigned_key_type(1) << (bucket - 1)) * !!bucket;
+                flags_ |= (unsigned_key_type(1) << (bucket - 1)) * (bucket != 0); //!!bucket;
             }
 
             void clear() {
@@ -161,8 +158,147 @@ namespace radix_heap {
         };
     }  // namespace internal
 
+    template<typename KeyType, typename ValueType, typename EncoderType = internal::encoder<KeyType>>
+    class pair_radix_heap {
+    public:
+        typedef KeyType key_type;
+        typedef ValueType value_type;
+        typedef EncoderType encoder_type;
+        typedef typename encoder_type::unsigned_key_type unsigned_key_type;
+        typedef typename std::vector<std::pair<key_type, value_type> >::const_iterator value_iterator;
+
+        pair_radix_heap() : size_(0), last_(), buckets_() {
+            buckets_min_.fill(std::numeric_limits<unsigned_key_type>::max());
+        }
+        void push(key_type key, const value_type &value) {
+            const unsigned_key_type x = encoder_type::encode(key);
+            assert(last_ <= x);
+            ++size_;
+            const size_t k = internal::find_bucket(x, last_);
+            //buckets_[k].emplace_back(x, value);
+            buckets_[k].push_back(std::pair<key_type , value_type >(x, std::move(value)));
+            bucket_flags_.set_non_empty(k);
+            buckets_min_[k] = std::min(buckets_min_[k], x);
+        }
+
+        void push(key_type key, value_type &&value) {
+            const unsigned_key_type& x = encoder_type::encode(key);
+            assert(last_ <= x);
+            ++size_;
+            const size_t k = internal::find_bucket(x, last_);
+            //buckets_[k].emplace_back(x, value);
+            buckets_[k].push_back(std::pair<key_type , value_type >(x, std::move(value)));
+            bucket_flags_.set_non_empty(k);
+            buckets_min_[k] = std::min(buckets_min_[k], x);
+        }
+        // TODO implement emplace() method. Construct and add pair in place.
+
+        template <class... Args>
+        void emplace(key_type key, Args&&... args) {
+            const unsigned_key_type x = encoder_type::encode(key);
+            assert(last_ <= x);
+            ++size_;
+            const size_t k = internal::find_bucket(x, last_);
 
 
+
+            buckets_[k].emplace_back(std::piecewise_construct,
+                                     std::forward_as_tuple(x), std::forward_as_tuple(args...));
+
+
+
+
+            bucket_flags_.set_non_empty(k);
+            buckets_min_[k] = std::min(buckets_min_[k], x);
+        }
+
+        key_type min_key() const {
+            assert(size_ > 0);
+
+            const size_t i = buckets_[0].empty() * bucket_flags_.find_first_non_empty();
+            return encoder_type::decode(buckets_min_[i]);
+        }
+
+        key_type top_key() {
+            pull();
+            return encoder_type::decode(last_);
+        }
+
+        value_type &top_value() {
+            pull();
+            return buckets_[0].back().second;
+        }
+
+        std::tuple<value_iterator, value_iterator> top_values() {
+            pull();
+            return std::forward_as_tuple(buckets_[0].cbegin(), buckets_[0].cend());
+        }
+
+        void pop() {
+            pull();
+            buckets_[0].pop_back();
+            --size_;
+        }
+
+        size_t size() const {
+            return size_;
+        }
+
+        bool empty() const {
+            return size_ == 0;
+        }
+
+        void clear() {
+            size_ = 0;
+            last_ = key_type();
+            for (auto &b : buckets_) b.clear();
+            buckets_min_.fill(std::numeric_limits<unsigned_key_type>::max());
+            bucket_flags_.clear();
+        }
+
+        void swap(pair_radix_heap<KeyType, ValueType, EncoderType> &a) {
+            std::swap(size_, a.size_);
+            std::swap(last_, a.last_);
+            bucket_flags_.swap(a.bucket_flags_);
+            buckets_.swap(a.buckets_);
+            buckets_min_.swap(a.buckets_min_);
+        }
+
+    private:
+        size_t size_;
+        unsigned_key_type last_ = std::numeric_limits<unsigned_key_type>::max();
+
+        std::array<stxxl::vector<std::pair<unsigned_key_type, value_type>>,
+                std::numeric_limits<unsigned_key_type>::digits + 1> buckets_;
+
+        std::array<unsigned_key_type,
+                std::numeric_limits<unsigned_key_type>::digits + 1> buckets_min_;
+
+
+        internal::bucket_flags<unsigned_key_type> bucket_flags_;
+        // TODO fix pull() method!
+        void pull() {
+            assert(size_ > 0);
+            if (!buckets_[0].empty()) return;
+
+            const size_t i = bucket_flags_.find_first_non_empty();
+            last_ = buckets_min_[i];
+
+            for (size_t j = 0; j < buckets_[i].size(); ++j) {
+                const unsigned_key_type x = buckets_[i][j].first;
+                const size_t k = internal::find_bucket(x, last_);
+                buckets_[k].push_back(std::move(buckets_[i][j]));
+                bucket_flags_.set_non_empty(k);
+                buckets_min_[k] = std::min(buckets_min_[k], x);
+            }
+
+            buckets_[i].clear();
+            bucket_flags_.set_empty(i);
+            buckets_min_[i] = std::numeric_limits<unsigned_key_type>::max();
+
+        }
+    };
+/*  //class deprecated
     template<typename KeyType, typename EncoderType = internal::encoder<KeyType>>
     class radix_heap {
     public:
@@ -255,145 +391,7 @@ namespace radix_heap {
             buckets_min_[i] = std::numeric_limits<unsigned_key_type>::max();
         }
     };
-
-    template<typename KeyType, typename ValueType, typename EncoderType = internal::encoder<KeyType>>
-    class pair_radix_heap {
-    public:
-        typedef KeyType key_type;
-        typedef ValueType value_type;
-        typedef EncoderType encoder_type;
-        typedef typename encoder_type::unsigned_key_type unsigned_key_type;
-        typedef typename std::vector<std::pair<key_type, value_type> >::const_iterator value_iterator;
-
-        pair_radix_heap() : size_(0), last_(), buckets_() {
-            // TODO a.fill() is an Array method, need replacement for stxxl::queue
-            buckets_min_.fill(std::numeric_limits<unsigned_key_type>::max());
-        }
-        // TODO fix method to use push_back instead of emplace_back. Understand method signature and do a test push with <key_type, const value_type &value>
-/*
-        void push(key_type key, const value_type &value) {
-            const unsigned_key_type x = encoder_type::encode(key);
-            assert(last_ <= x);
-            ++size_;
-            const size_t k = internal::find_bucket(x, last_);
-            buckets_[k].emplace_back(x, value);
-            bucket_flags_.set_non_empty(k);
-            buckets_min_[k] = std::min(buckets_min_[k], x);
-        }
 */
-        void push(key_type key, value_type &&value) { // works
-            const unsigned_key_type& x = encoder_type::encode(key);
-            std::cout << "input: " << key << " converted to: " << x << std::endl;
-            std::cout << "checking new: " << x << " against old: " << last_ << std::endl;
-            assert(last_ <= x);
-            ++size_;
-            const size_t k = internal::find_bucket(x, last_);
-            buckets_[k].push_back(std::pair<key_type , value_type >(x, std::move(value)));
-            bucket_flags_.set_non_empty(k);
-            buckets_min_[k] = std::min(buckets_min_[k], x);
-        }
-        // TODO implement emplace() method. What is the benefit of having Args&& ... parameter? What is the benefit of std::forward_as_ .. method?
-/*
-        template <class... Args>
-        void emplace(key_type key, Args&&... args) {
-            const unsigned_key_type x = encoder_type::encode(key);
-            assert(last_ <= x);
-            ++size_;
-            const size_t k = internal::find_bucket(x, last_);
-            buckets_[k].emplace_back(std::piecewise_construct,
-                                     std::forward_as_tuple(x), std::forward_as_tuple(args...));
-            bucket_flags_.set_non_empty(k);
-            buckets_min_[k] = std::min(buckets_min_[k], x);
-        }
-*/
-        key_type min_key() const {
-            assert(size_ > 0);
-
-            const size_t i = buckets_[0].empty() * bucket_flags_.find_first_non_empty();
-            return encoder_type::decode(buckets_min_[i]);
-        }
-
-        key_type top_key() {
-            pull();
-            return encoder_type::decode(last_);
-        }
-
-        value_type &top_value() {
-            pull();
-            return buckets_[0].back().second;
-        }
-
-        std::tuple<value_iterator, value_iterator> top_values() {
-            pull();
-            return std::forward_as_tuple(buckets_[0].cbegin(), buckets_[0].cend());
-        }
-
-        void pop() {
-            pull();
-            buckets_[0].pop_back();
-            --size_;
-        }
-
-        size_t size() const {
-            return size_;
-        }
-
-        bool empty() const {
-            return size_ == 0;
-        } // works
-
-        void clear() {
-            size_ = 0;
-            last_ = key_type();
-            for (auto &b : buckets_) b.clear();
-            buckets_min_.fill(std::numeric_limits<unsigned_key_type>::max());
-            bucket_flags_.clear();
-        } // works
-
-        void swap(pair_radix_heap<KeyType, ValueType, EncoderType> &a) {
-            std::swap(size_, a.size_);
-            std::swap(last_, a.last_);
-            bucket_flags_.swap(a.bucket_flags_);
-            buckets_.swap(a.buckets_);
-            buckets_min_.swap(a.buckets_min_);
-        }
-
-    private:
-        size_t size_;
-        unsigned_key_type last_;
-
-        std::array<stxxl::vector<std::pair<unsigned_key_type, value_type>>,
-                std::numeric_limits<unsigned_key_type>::digits + 1> buckets_;
-/*
-        std::array<std::vector<std::pair<unsigned_key_type, value_type>>,
-                std::numeric_limits<unsigned_key_type>::digits + 1> buckets_;
-*/
-        std::array<unsigned_key_type,
-                std::numeric_limits<unsigned_key_type>::digits + 1> buckets_min_;
-
-
-        internal::bucket_flags<unsigned_key_type> bucket_flags_;
-
-        void pull() {
-            assert(size_ > 0);
-            if (!buckets_[0].empty()) return;
-
-            const size_t i = bucket_flags_.find_first_non_empty();
-            last_ = buckets_min_[i];
-
-            for (size_t j = 0; j < buckets_[i].size(); ++j) {
-                const unsigned_key_type x = buckets_[i][j].first;
-                const size_t k = internal::find_bucket(x, last_);
-                buckets_[k].emplace_back(std::move(buckets_[i][j]));
-                bucket_flags_.set_non_empty(k);
-                buckets_min_[k] = std::min(buckets_min_[k], x);
-            }
-
-            buckets_[i].clear();
-            bucket_flags_.set_empty(i);
-            buckets_min_[i] = std::numeric_limits<unsigned_key_type>::max();
-        }
-    };
 }  // namespace radix_heap
 
 #endif //RADIX_HEAP_RADIX_HEAP_H
