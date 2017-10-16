@@ -112,6 +112,10 @@ namespace radix_heap {
 
         template<typename KeyType>
         class encoder : public encoder_impl_integer<KeyType, std::is_signed<KeyType>::value> {};
+        // TODO encoder<int> needed?
+/*      template<>
+        class encoder<int> : public encoder_impl_decimal<int, uint32_t>{};
+*/
         template<>
         class encoder<float> : public encoder_impl_decimal<float, uint32_t> {};
         template<>
@@ -262,9 +266,11 @@ namespace radix_heap {
         typedef typename std::vector<std::pair<key_type, value_type> >::const_iterator value_iterator;
 
         pair_radix_heap() : size_(0), last_(), buckets_() {
+            // TODO a.fill() is an Array method, need replacement for stxxl::queue
             buckets_min_.fill(std::numeric_limits<unsigned_key_type>::max());
         }
-
+        // TODO fix method to use push_back instead of emplace_back. Understand method signature and do a test push with <key_type, const value_type &value>
+/*
         void push(key_type key, const value_type &value) {
             const unsigned_key_type x = encoder_type::encode(key);
             assert(last_ <= x);
@@ -274,17 +280,20 @@ namespace radix_heap {
             bucket_flags_.set_non_empty(k);
             buckets_min_[k] = std::min(buckets_min_[k], x);
         }
-
-        void push(key_type key, value_type &&value) {
+*/
+        void push(key_type key, value_type &&value) { // works
             const unsigned_key_type& x = encoder_type::encode(key);
+            std::cout << "input: " << key << " converted to: " << x << std::endl;
+            std::cout << "checking new: " << x << " against old: " << last_ << std::endl;
             assert(last_ <= x);
             ++size_;
             const size_t k = internal::find_bucket(x, last_);
-            buckets_[k].emplace_back(x, std::move(value));
+            buckets_[k].push_back(std::pair<key_type , value_type >(x, std::move(value)));
             bucket_flags_.set_non_empty(k);
             buckets_min_[k] = std::min(buckets_min_[k], x);
         }
-
+        // TODO implement emplace() method. What is the benefit of having Args&& ... parameter? What is the benefit of std::forward_as_ .. method?
+/*
         template <class... Args>
         void emplace(key_type key, Args&&... args) {
             const unsigned_key_type x = encoder_type::encode(key);
@@ -296,7 +305,7 @@ namespace radix_heap {
             bucket_flags_.set_non_empty(k);
             buckets_min_[k] = std::min(buckets_min_[k], x);
         }
-
+*/
         key_type min_key() const {
             assert(size_ > 0);
 
@@ -331,7 +340,7 @@ namespace radix_heap {
 
         bool empty() const {
             return size_ == 0;
-        }
+        } // works
 
         void clear() {
             size_ = 0;
@@ -339,7 +348,7 @@ namespace radix_heap {
             for (auto &b : buckets_) b.clear();
             buckets_min_.fill(std::numeric_limits<unsigned_key_type>::max());
             bucket_flags_.clear();
-        }
+        } // works
 
         void swap(pair_radix_heap<KeyType, ValueType, EncoderType> &a) {
             std::swap(size_, a.size_);
@@ -352,15 +361,16 @@ namespace radix_heap {
     private:
         size_t size_;
         unsigned_key_type last_;
-/*
-        stxxl::queue<stxxl::vector<std::pair<unsigned_key_type, value_type>>,
+
+        std::array<stxxl::vector<std::pair<unsigned_key_type, value_type>>,
                 std::numeric_limits<unsigned_key_type>::digits + 1> buckets_;
-*/
+/*
         std::array<std::vector<std::pair<unsigned_key_type, value_type>>,
                 std::numeric_limits<unsigned_key_type>::digits + 1> buckets_;
-
+*/
         std::array<unsigned_key_type,
                 std::numeric_limits<unsigned_key_type>::digits + 1> buckets_min_;
+
 
         internal::bucket_flags<unsigned_key_type> bucket_flags_;
 
