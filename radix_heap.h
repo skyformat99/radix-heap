@@ -218,11 +218,13 @@ namespace radix_heap {
             pull();
             return buckets_[0].back().second;
         }
-
+        // TODO fix top_values() method, not necessarily a requirement
+        /*
         std::tuple<value_iterator, value_iterator> top_values() {
             pull();
             return std::forward_as_tuple(buckets_[0].cbegin(), buckets_[0].cend());
         }
+        */
 
         void pop() {
             pull();
@@ -246,6 +248,8 @@ namespace radix_heap {
             bucket_flags_.clear();
         }
 
+        // TODO fix swap() method
+        /*
         void swap(pair_radix_heap<KeyType, ValueType, EncoderType> &a) {
             std::swap(size_, a.size_);
             std::swap(last_, a.last_);
@@ -253,6 +257,7 @@ namespace radix_heap {
             buckets_.swap(a.buckets_);
             buckets_min_.swap(a.buckets_min_);
         }
+        */
 
     private:
         size_t size_;

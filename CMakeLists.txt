@@ -3,11 +3,16 @@ project(radix_heap)
 
 set(CMAKE_CXX_STANDARD 11)
 
+#set(LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/stxxl/build")
+#add_library("stxxl/include")
+#target_link_libraries("stxxl/include")
+
 #set(STXXL_INCLUDE_DIR "stxxl/include" CACHE PATH "stxxl include dir")
 #install(DIRECTORY ${STXXL_INCLUDE_DIR} DESTINATION "stxxl/build")
 
 # search for stxxl-config.cmake which contains the library's configuration
 set(STXXL_DIR "/home/ndrshrzg/Documents/stxxl/build")
+#set(STXXL_DIR "stxxl/build")
 find_package(STXXL REQUIRED)
 
 # print some info (this can be removed)
