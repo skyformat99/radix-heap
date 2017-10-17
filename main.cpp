@@ -1,9 +1,18 @@
 #include <iostream>
 #include "radix_heap.h"
+#include "test_pass_by_rvalue.h"
 
 int main() {
     //TODO Try different value types. Why is std::string not working?
     radix_heap::pair_radix_heap<uint32_t , std::string> rh;
+
+    std::string&& val = getVal();
+
+    rh.push(3, std::move(val));
+
+    std::string&& emplace_val = getArgs();
+
+    rh.emplace(1, std::move(emplace_val));
 
     std::cout << "is empty after declaration: " << rh.empty() << std::endl;
     rh.push(13, "thirteen");
@@ -35,11 +44,7 @@ int main() {
     std::cout << "top key after pop: " << rh.top_key() << std::endl;
     std::cout << "top value after pop: " << rh.top_value() << std::endl;
 
-    //rh.push(6, x); // test whether monotonous characteristic of keys holds
-
-
-
-
+    //rh.push(6, "fails"); // test whether monotonous characteristic of keys holds
 
     return 0;
 }

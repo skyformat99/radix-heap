@@ -175,7 +175,6 @@ namespace radix_heap {
             assert(last_ <= x);
             ++size_;
             const size_t k = internal::find_bucket(x, last_);
-            //buckets_[k].emplace_back(x, value);
             buckets_[k].push_back(std::pair<key_type , value_type >(x, std::move(value)));
             bucket_flags_.set_non_empty(k);
             buckets_min_[k] = std::min(buckets_min_[k], x);
@@ -186,12 +185,10 @@ namespace radix_heap {
             assert(last_ <= x);
             ++size_;
             const size_t k = internal::find_bucket(x, last_);
-            //buckets_[k].emplace_back(x, value);
             buckets_[k].push_back(std::pair<key_type , value_type >(x, std::move(value)));
             bucket_flags_.set_non_empty(k);
             buckets_min_[k] = std::min(buckets_min_[k], x);
         }
-        // TODO implement emplace() method. Construct and add pair in place.
 
         template <class... Args>
         void emplace(key_type key, Args&&... args) {
@@ -199,15 +196,8 @@ namespace radix_heap {
             assert(last_ <= x);
             ++size_;
             const size_t k = internal::find_bucket(x, last_);
-
-
-
-            buckets_[k].emplace_back(std::piecewise_construct,
-                                     std::forward_as_tuple(x), std::forward_as_tuple(args...));
-
-
-
-
+            buckets_[k].push_back(std::pair<key_type, value_type>(std::piecewise_construct,
+                                       std::forward_as_tuple(x), std::forward_as_tuple(args...)));
             bucket_flags_.set_non_empty(k);
             buckets_min_[k] = std::min(buckets_min_[k], x);
         }
@@ -276,7 +266,6 @@ namespace radix_heap {
 
 
         internal::bucket_flags<unsigned_key_type> bucket_flags_;
-        // TODO fix pull() method!
         void pull() {
             assert(size_ > 0);
             if (!buckets_[0].empty()) return;
