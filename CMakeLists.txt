@@ -3,6 +3,9 @@ project(radix_heap)
 
 set(CMAKE_CXX_STANDARD 11)
 
+#set(STXXL_INCLUDE_DIR "stxxl/include" CACHE PATH "stxxl include dir")
+#install(DIRECTORY ${STXXL_INCLUDE_DIR} DESTINATION "stxxl/build")
+
 # search for stxxl-config.cmake which contains the library's configuration
 set(STXXL_DIR "/home/ndrshrzg/Documents/stxxl/build")
 find_package(STXXL REQUIRED)
@@ -17,7 +20,6 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${STXXL_CXX_FLAGS}")
 
 # add STXXL include directory
 include_directories(${STXXL_INCLUDE_DIRS})
-include_directories("/home/ndrshrzg/CLionProjects/radix_heap")
 
 # create and executable and linke with STXXL
 
