@@ -23,5 +23,5 @@ include_directories(${STXXL_INCLUDE_DIRS})
 
 # create and executable and linke with STXXL
 
-add_executable(radix_heap main.cpp test_pass_by_rvalue.h)
+add_executable(radix_heap main.cpp radix_heap.h test_pass_by_rvalue.h)
 target_link_libraries(radix_heap ${STXXL_LIBRARIES})
